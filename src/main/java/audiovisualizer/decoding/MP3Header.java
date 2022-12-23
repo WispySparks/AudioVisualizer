@@ -24,6 +24,13 @@ public record MP3Header(
         SINGLE_CHANNEL
     }
 
+    enum JointStereoBands {
+        BAND_4_31,
+        BAND_8_31,
+        BAND_12_31,
+        BAND_16_31
+    }
+
     enum Emphasis {
         NONE,
         MICROSECONDS_50_15,
