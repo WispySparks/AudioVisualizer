@@ -80,13 +80,7 @@ public class MP3Decoder {
         if (currentHeader.errorProtection()) {
             crc = readCRC(stream);
         }
-        int frameLength = 0;
-        if (currentHeader.layer() == Layer.LAYER1) {
-            frameLength = (int) (12 * (currentHeader.bitrate()/currentHeader.samplingFrequency()));
-        } else {
-            frameLength = (int) (144 * (currentHeader.bitrate()/currentHeader.samplingFrequency()));
-        }
-        System.out.println(frameLength);
+        int frameLength = getFrameLength(stream);
     }
 
     /**
@@ -356,6 +350,21 @@ public class MP3Decoder {
      */
     private short readCRC(FileInputStream stream) throws IOException {
         return ByteBuffer.wrap(stream.readNBytes(2)).getShort();
+    }
+
+    /**
+     * {@link} http://www.diva-portal.org/smash/get/diva2:830195/FULLTEXT01.pdf 
+     */
+    private int getFrameLength(FileInputStream stream) throws IOException {
+        int frameLengthBytes = 0;
+        if (currentHeader.layer() == Layer.LAYER1) {
+            frameLengthBytes = (int) (12 * currentHeader.bitrate()/currentHeader.samplingFrequency());
+        } else {
+            // FLB = 144 * (Bitrate/Samplerate) + Padding where FLB is the frame length in bytes
+            frameLengthBytes = (int) (144 * currentHeader.bitrate()/currentHeader.samplingFrequency());
+        }
+        if (currentHeader.padded()) frameLengthBytes++;
+        return frameLengthBytes;
     }
     
 }
