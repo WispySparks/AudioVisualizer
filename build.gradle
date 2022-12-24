@@ -1,15 +1,22 @@
 plugins {
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.0.13'
+    id 'org.beryx.jlink' version '2.25.0'
 }
 
 repositories {
     mavenCentral()
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
 javafx {
     version = '19'
-    modules = [ 'javafx.media' ]
+    modules = [ 'javafx.controls', 'javafx.media' ]
 }
 
 dependencies {
@@ -17,4 +24,34 @@ dependencies {
 
 application {
     mainClass = 'audiovisualizer.Main'
+    mainModule = 'audiovisualizer'
 }
+
+jlink {
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+    imageName = 'AsciiImage'
+    launcher{
+        name = 'Launch'
+        noConsole = true
+        windowsScriptTemplate = file('C:/Users/wispy/ProgrammingProjects/GradleStuff/templates/unixtemplate.txt')
+        unixScriptTemplate = file('C:/Users/wispy/ProgrammingProjects/GradleStuff/templates/unixtemplate.txt')
+    }
+}
+
+tasks.jlink.doLast {
+    delete("${buildDir}\\AsciiImage\\release")
+    copy {
+        from("${buildDir}\\AsciiImage\\bin\\Launch")
+        into("${buildDir}\\AsciiImage")
+        rename('Launch', 'Launch.sh')
+        
+    }
+    copy {
+        from("${buildDir}\\AsciiImage\\bin\\Launch.bat")
+        into("${buildDir}\\AsciiImage")
+    }
+    delete("${buildDir}\\AsciiImage\\bin\\Launch")
+    delete("${buildDir}\\AsciiImage\\bin\\Launch.bat")
+}
+
+defaultTasks 'clean'
