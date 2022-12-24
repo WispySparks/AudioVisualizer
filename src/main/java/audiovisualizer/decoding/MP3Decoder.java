@@ -74,17 +74,23 @@ public class MP3Decoder {
         stream.skip(metadataSize);
     }
 
-    
+    @SuppressWarnings("unused")
     private void readFrame(FileInputStream stream) throws IOException {
         currentHeader = readFrameHeader(stream);
         if (currentHeader.errorProtection()) {
             crc = readCRC(stream);
         }
         int frameLength = getFrameLength(stream);
+        System.out.println(currentHeader.layer());
+        switch(currentHeader.layer()) {
+            case LAYER1 -> readAudioDataLayer1(stream);
+            case LAYER2 -> readAudioDataLayer2(stream);
+            case LAYER3 -> readAudioDataLayer3(stream);
+        }
     }
 
     /**
-     * Reads an MP3 Frame header which is 4 bytes long and returns an MP3Header object by parsing the data from the 32 bits that contains the following: 
+     * Reads an MP3 Frame header which is 4 bytes long and returns an MP3Header record by parsing the data from the 32 bits that contain the following: 
      * MPEG Version, MPEG Layer, Error Protection (boolean), Bitrate in kbps, Sampling Frequency in kHz, Frame Padded (boolean),
      * Channel Mode, Mode Extension Bands for Layers 1 & 2 or type of joint stereo for Layer 3 - when Channel Mode is JOINT_STEREO,
      * Copyrighted (boolean), Original or Copy (boolean), and the type of de-emphasis to use. <p>
@@ -365,6 +371,43 @@ public class MP3Decoder {
         }
         if (currentHeader.padded()) frameLengthBytes++;
         return frameLengthBytes;
+    }
+
+    private void readAudioDataLayer1(FileInputStream stream) throws IOException { 
+        for (byte b : stream.readNBytes(64)) {
+            System.out.print(b + ", ");
+        }
+        /*
+        audio_data() {
+            for (sb=0; sb<bound; sb++) 
+                for (ch=0; ch<nch; ch++)
+                    allocation{ch}[sb]
+            for (sb=bound; sb<32; sb++) {
+                allocation{0][sb]
+                allocation[1 ||sb|=allocation|0|Isb]
+            }
+            for (sb=0; sb<32; sb++)
+                for (ch=0; ch<nch; ch++)
+                    if (allocation[ch][sb]!=0)
+                        scalefactor{ch][sb]
+            for (s=0; s<12; s++) {
+                for (sb=0; sb<bound; sb++)
+                    for (ch=0; chench; ch++)
+                        if (allocation[ch]{sb}!=0)
+                            sample{ch}{sb][s]
+            for (sb=bound; sb<32; sb++)
+                if (allocation(0}[sb]'=0)
+                    sample[0][sb][s]
+        }
+         */
+    }
+
+    private void readAudioDataLayer2(FileInputStream stream) throws IOException {
+        
+    }
+
+    private void readAudioDataLayer3(FileInputStream stream) throws IOException {
+        
     }
     
 }
