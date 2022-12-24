@@ -13,10 +13,10 @@ import audiovisualizer.decoding.MP3Header.MPEGVersion;
 import audiovisualizer.decoding.MP3Header.Mode;
 import audiovisualizer.util.Triple;
 
-@SuppressWarnings("unused")
 public class MP3Decoder { 
 
     MP3Header currentHeader;
+    short crc;
 
     public void decode(File file) {
         try {
@@ -74,6 +74,9 @@ public class MP3Decoder {
     
     private void readFrame(FileInputStream stream) throws IOException {
         currentHeader = readFrameHeader(stream);
+        if (currentHeader.errorProtection()) {
+            crc = readCRC(stream);
+        }
     }
 
     /**
@@ -91,7 +94,7 @@ public class MP3Decoder {
         int headerInfo = stream.read();
         int syncword2 = headerInfo >> 4; // Frame sync
         if (syncword != 0xFF || syncword2 != 0xF ) throw new StreamCorruptedException("MP3 Header Invalid Syncword " + syncword + " " + syncword2); // Make sure sync word is FFF
-        int versionNumber = headerInfo & 0b00001000 >> 3; // MPEG Audio version ID
+        int versionNumber = headerInfo & 0b00001000 >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version 
             case 0 -> MPEGVersion.MPEG_2_5;
             case 1 -> MPEGVersion.RESERVED;
@@ -141,7 +144,8 @@ public class MP3Decoder {
             case 3 -> Emphasis.CCITT_J_17;
             default -> throw new StreamCorruptedException("MP3 Header Invalid Emphasis " + emphasisNumber);
         };
-        MP3Header header = new MP3Header();
+        MP3Header header = new MP3Header(version, layer, errorProtection, bitrate, frequency, 
+        padded, mode, intensityStereo, msStereo, bands, copyrighted, original, emphasis);
         return header;
     }
 
@@ -315,4 +319,8 @@ public class MP3Decoder {
         return new Triple<Boolean,Boolean, JointStereoBands>(intensityStereo, msStereo, bands);
     }    
 
+    private short readCRC(FileInputStream stream) throws IOException {
+        return ByteBuffer.wrap(stream.readNBytes(2)).getShort();
+    }
+    
 }

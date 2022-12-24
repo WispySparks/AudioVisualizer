@@ -1,6 +1,20 @@
 package audiovisualizer.decoding;
 
 public record MP3Header(
+
+    MPEGVersion version,
+    Layer layer,
+    boolean errorProtection,
+    int bitrate,
+    double frequency,
+    boolean padded,
+    Mode mode,
+    boolean intensityStereo,
+    boolean msStereo,
+    JointStereoBands bands,
+    boolean copyrighted,
+    boolean original,
+    Emphasis emphasis
     
 ) {
     enum MPEGVersion {
