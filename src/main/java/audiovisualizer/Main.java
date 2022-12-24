@@ -18,11 +18,13 @@ public class Main {
         System.out.println("Hello World!");
         MP3Decoder decoder = new MP3Decoder();
         // MPEG Version 1 Audio Layer 3
+        File mp3 = new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3");
         List<File> files = new ArrayList<>();
         files.add(new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3"));
         files.add(new File("C:\\Users\\wispy\\Music\\Music\\RegularShowCredits.mp3"));
         files.add(new File("C:\\Users\\wispy\\Music\\Music\\World 8 Bowser Theme.mp3"));
-        files.forEach((mp3) -> decoder.decode(mp3));
+        files.add(new File("C:\\Users\\wispy\\Music\\Music\\Madness8.mp3"));
+        files.forEach((file) -> decoder.decode(file));
         // Play the audio file
         // Platform.startup(() -> {
         //     media = new Media(mp3.toURI().toString());

@@ -40,7 +40,10 @@ public class MP3Decoder {
         String id3 = "ID3";
         byte[] bytes = stream.readNBytes(3);
         for (int i = 0; i < bytes.length; i++) {
-            if (AsciiTable.convert(bytes[i]) != id3.charAt(i)) return false;
+            if (AsciiTable.convert(bytes[i]) != id3.charAt(i)) {
+                stream.skip(-3);
+                return false;
+            }
         }
         return true;
     }
@@ -77,6 +80,13 @@ public class MP3Decoder {
         if (currentHeader.errorProtection()) {
             crc = readCRC(stream);
         }
+        int frameLength = 0;
+        if (currentHeader.layer() == Layer.LAYER1) {
+            frameLength = (int) (12 * (currentHeader.bitrate()/currentHeader.samplingFrequency()));
+        } else {
+            frameLength = (int) (144 * (currentHeader.bitrate()/currentHeader.samplingFrequency()));
+        }
+        System.out.println(frameLength);
     }
 
     /**
@@ -97,14 +107,14 @@ public class MP3Decoder {
         int versionNumber = headerInfo & 0b00001000 >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version 
             case 0 -> MPEGVersion.MPEG_2_5;
-            case 1 -> MPEGVersion.RESERVED;
+            case 1 -> MPEGVersion.MPEG_1; // Reserved
             case 2 -> MPEGVersion.MPEG_2;
             case 3 -> MPEGVersion.MPEG_1;
             default -> throw new StreamCorruptedException("MP3 Header Invalid Version " + versionNumber);
         };
         int layerNumber = headerInfo & 0b00000110 >> 1; // MPEG Layer
         Layer layer = switch(layerNumber) { // MPEG Layer
-            case 0 -> Layer.RESERVED;
+            case 0 -> Layer.LAYER1; // Reserved
             case 1 -> Layer.LAYER3;
             case 2 -> Layer.LAYER2;
             case 3 -> Layer.LAYER1;
@@ -149,11 +159,17 @@ public class MP3Decoder {
         return header;
     }
 
+    /**
+     * Takes an input index number and returns the corresponding value in the bitrate table based on MPEG version and layer.
+     * @param version MPEG Version
+     * @param layer MPEG Layer
+     * @param index 4 bit index from MP3 Header
+     * @return bitrate
+     * @throws StreamCorruptedException
+     */
     private int bitrateTable(MPEGVersion version, Layer layer, int index) throws StreamCorruptedException {
         return switch(version) {
-            case RESERVED:
             case MPEG_1: yield switch(layer) {
-                case RESERVED:
                 case LAYER1: yield switch(index) {
                     case 0 -> 0;
                     case 1 -> 32;
@@ -211,7 +227,6 @@ public class MP3Decoder {
             };
             case MPEG_2:
             case MPEG_2_5: yield switch(layer) {
-                case RESERVED:
                 case LAYER1: yield switch(index) {
                     case 0 -> 0;
                     case 1 -> 32;
@@ -254,9 +269,15 @@ public class MP3Decoder {
         
     }
 
+    /**
+     * Takes an input index number and returns the corresponding value in the frequency table based on MPEG version.
+     * @param version MPEG Version
+     * @param index 2 bit index from MP3 Header
+     * @return Sampling frequency
+     * @throws StreamCorruptedException
+     */
     private double frequencyTable(MPEGVersion version, int index) throws StreamCorruptedException {
         return switch(version) {
-            case RESERVED:
             case MPEG_1: yield switch(index) {
                 case 0 -> 44.1;
                 case 1 -> 48;
@@ -281,23 +302,31 @@ public class MP3Decoder {
         };
     }
 
-    private Triple<Boolean, Boolean, JointStereoBands> configureModeExtension(Layer layer, int modeExtension) throws StreamCorruptedException {
+    /**
+     * Used when the channel mode is JOINT_STEREO to find out what the bands to use for Layer 1 & 2 or what combination of 
+     * intensity/ms stereo to use for Layer 3.
+     * @param layer MPEG Layer
+     * @param index 2 bit index from MP3 Header
+     * @return A datatype that holds the whether or not to use intensity stereo, ms stereo and the bands to use for Layer 1 or 2
+     * @throws StreamCorruptedException
+     */
+    private Triple<Boolean, Boolean, JointStereoBands> configureModeExtension(Layer layer, int index) throws StreamCorruptedException {
         boolean intensityStereo = false;
         boolean msStereo = false;
         JointStereoBands bands = JointStereoBands.BAND_4_31;
         if (layer == Layer.LAYER1 || layer == Layer.LAYER2) {
             intensityStereo = true;
             msStereo = false;
-            bands = switch(modeExtension) {
+            bands = switch(index) {
                 case 0 -> JointStereoBands.BAND_4_31;
                 case 1 -> JointStereoBands.BAND_8_31;
                 case 2 -> JointStereoBands.BAND_12_31;
                 case 3 -> JointStereoBands.BAND_16_31;
-                default -> throw new StreamCorruptedException("MP3 Header Invalid Mode Extension " + modeExtension);
+                default -> throw new StreamCorruptedException("MP3 Header Invalid Mode Extension " + index);
             };
         } 
         else {
-            switch(modeExtension) {
+            switch(index) {
                 case 0 -> {
                     intensityStereo = false;
                     msStereo = false;
@@ -319,6 +348,12 @@ public class MP3Decoder {
         return new Triple<Boolean,Boolean, JointStereoBands>(intensityStereo, msStereo, bands);
     }    
 
+    /**
+     * Used to grab the CRC after the MP3 Header if error protection is set.
+     * @param stream
+     * @return The crc that was read
+     * @throws IOException
+     */
     private short readCRC(FileInputStream stream) throws IOException {
         return ByteBuffer.wrap(stream.readNBytes(2)).getShort();
     }

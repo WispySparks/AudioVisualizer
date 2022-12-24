@@ -5,8 +5,8 @@ public record MP3Header(
     MPEGVersion version,
     Layer layer,
     boolean errorProtection,
-    int bitrate,
-    double frequency,
+    double bitrate,
+    double samplingFrequency,
     boolean padded,
     Mode mode,
     boolean intensityStereo,
@@ -21,14 +21,12 @@ public record MP3Header(
         MPEG_1,
         MPEG_2,
         MPEG_2_5,
-        RESERVED
     }
 
     enum Layer {
         LAYER1,
         LAYER2,
         LAYER3,
-        RESERVED
     }
 
     enum Mode {
