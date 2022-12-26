@@ -1,4 +1,4 @@
-package audiovisualizer.decoding;
+package audiovisualizer.mp3;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -6,11 +6,11 @@ import java.io.IOException;
 import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 
-import audiovisualizer.decoding.MP3Header.Emphasis;
-import audiovisualizer.decoding.MP3Header.JointStereoBands;
-import audiovisualizer.decoding.MP3Header.Layer;
-import audiovisualizer.decoding.MP3Header.MPEGVersion;
-import audiovisualizer.decoding.MP3Header.Mode;
+import audiovisualizer.mp3.MP3Header.Emphasis;
+import audiovisualizer.mp3.MP3Header.JointStereoBands;
+import audiovisualizer.mp3.MP3Header.Layer;
+import audiovisualizer.mp3.MP3Header.MPEGVersion;
+import audiovisualizer.mp3.MP3Header.Mode;
 import audiovisualizer.util.Triple;
 
 public class MP3Decoder { 
@@ -40,7 +40,7 @@ public class MP3Decoder {
         String id3 = "ID3";
         byte[] bytes = stream.readNBytes(3);
         for (int i = 0; i < bytes.length; i++) {
-            if (AsciiTable.convert(bytes[i]) != id3.charAt(i)) {
+            if (bytes[i] != id3.charAt(i)) {
                 stream.skip(-3);
                 return false;
             }
