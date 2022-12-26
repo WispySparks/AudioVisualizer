@@ -23,6 +23,8 @@ public class Main {
         WavFile wav = wavDecoder.decode(new File("C:\\Users\\wispy\\Music\\Music\\chromemusicsong.wav"));
         AudioPlayer player = new AudioPlayer();
         // player.playPCMData(wav.data(), wav.sampleRate(), wav.bitsPerSample(), wav.numChannels(), 1);
+        // List<List<Long>> samples = player.parsePCMData(wav.data(), wav.bitsPerSample(), wav.numChannels());
+        // System.out.println(samples.get(0).size()/wav.sampleRate()); // returns 18 - audio file is 18 seconds, LETS GOO!!
         // MPEG Version 1 Audio Layer 3
         File mp3 = new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3");
         List<File> files = new ArrayList<>();

@@ -30,6 +30,7 @@ public class WavDecoder {
             stream.close();
             return new WavFile(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
         } catch (IOException e) {
+            System.out.println("Error decoding WAV file.");
             e.printStackTrace();
         }
         return new WavFile(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
