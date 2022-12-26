@@ -1,6 +1,13 @@
 name: Gradle Build Project
 
-on: [workflow_dispatch, push, pull_request]
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    paths-ignore:
+      - '**/README.md'
+      - '**/LICENSE.txt'
+      - '**/.gitignore'
 
 jobs:
   build:
