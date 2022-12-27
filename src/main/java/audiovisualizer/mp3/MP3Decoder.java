@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import audiovisualizer.mp3.MP3Header.Emphasis;
@@ -36,6 +37,7 @@ public class MP3Decoder {
         }
         return new MP3(frames);
     }
+
     @SuppressWarnings("unused")
     private void readFrame(FileInputStream stream) throws IOException {
         currentHeader = readFrameHeader(stream);
@@ -158,7 +160,7 @@ public class MP3Decoder {
             default -> throw new StreamCorruptedException("MP3 Header Invalid Emphasis " + emphasisNumber);
         };
         MP3Header header = new MP3Header(version, layer, errorProtection, bitrate, frequency, 
-        padded, mode, intensityStereo, msStereo, bands, copyrighted, original, emphasis);
+        padded, mode, modeExtensionNumber, intensityStereo, msStereo, bands, copyrighted, original, emphasis);
         return header;
     }
 
@@ -376,33 +378,49 @@ public class MP3Decoder {
         return frameLengthBytes;
     }
 
+    /**
+     * {@link} https://www.iso.org/standard/22412.html Section 2.4.1.5
+     * @param stream
+     * @throws IOException
+     */
     private void readAudioDataLayer1(FileInputStream stream) throws IOException { 
-        for (byte b : stream.readNBytes(64)) {
-            System.out.print(b + ", ");
-        }
-        /*
-        audio_data() {
-            for (sb=0; sb<bound; sb++) 
-                for (ch=0; ch<nch; ch++)
-                    allocation{ch}[sb]
-            for (sb=bound; sb<32; sb++) {
-                allocation{0][sb]
-                allocation[1 ||sb|=allocation|0|Isb]
+        // Unsigned integer, most significant bit first. = uimsbf
+        int[][] bitAllocation = new int[2][32]; // Channel, Sub-band
+        int[][] scaleFactor = new int[2][32]; // Channel, Sub-band
+        int[][][] sample = new int[2][32][12]; // Channel, Sub-band, uh idk 
+        int bound = currentHeader.mode() == Mode.JOINT_STEREO ? (currentHeader.modeExtensionNumber()+1)*4 : 32;
+        int numberOfChannels = currentHeader.mode() == Mode.SINGLE_CHANNEL ? 1 : 2;
+        for (int subBand = 0; subBand < bound; subBand++) {
+            for (int channel = 0; channel < numberOfChannels; channel++) {
+                bitAllocation[channel][subBand] = stream.read() >>> 4; // fix this , 4 bits, uimsbf
             }
-            for (sb=0; sb<32; sb++)
-                for (ch=0; ch<nch; ch++)
-                    if (allocation[ch][sb]!=0)
-                        scalefactor{ch][sb]
-            for (s=0; s<12; s++) {
-                for (sb=0; sb<bound; sb++)
-                    for (ch=0; chench; ch++)
-                        if (allocation[ch]{sb}!=0)
-                            sample{ch}{sb][s]
-            for (sb=bound; sb<32; sb++)
-                if (allocation(0}[sb]'=0)
-                    sample[0][sb][s]
         }
-         */
+        for (int subBand = bound; subBand < 32; subBand++) {
+            bitAllocation[0][subBand] = stream.read() >>> 4; // fix this , 4 bits, uimsbf
+            bitAllocation[1][subBand] = bitAllocation[0][subBand];
+        }
+        for (int subBand = 0; subBand < 32; subBand++) {
+            for (int channel = 0; channel < numberOfChannels; channel++) {
+                if (bitAllocation[channel][subBand] != 0) {
+                    scaleFactor[channel][subBand] = stream.read() >>> 2; // fix this , 6 bits, uimsbf
+                }
+            }
+        }
+        for (int s = 0; s < 12; s++) {
+            for (int subBand = 0; subBand < bound; subBand++) {
+                for (int channel = 0; channel < numberOfChannels; channel++) {
+                    if (bitAllocation[channel][subBand] != 0) {
+                        sample[channel][subBand][s] = 0; // stream.readNBits(bitAllocation[channel][subBand]+1); uimsbf
+                    }
+                }
+            }
+            for (int subBand = bound; subBand < 32; subBand++) {
+                if (bitAllocation[0][subBand] != 0) {
+                    sample[0][subBand][s] = 0; // stream.readNBits(bitAllocation[0][subBand]+1); uimsbf
+                }
+            }
+        }
+        System.out.println(Arrays.deepToString(sample));        
     }
 
     private void readAudioDataLayer2(FileInputStream stream) throws IOException {

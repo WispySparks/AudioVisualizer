@@ -23,17 +23,17 @@ public class WavDecoder {
     private int bitsPerSample= 16;
     private byte[] data = new byte[0];
 
-    public Wav decode(File file) {
+    public WAV decode(File file) {
         try {
             FileInputStream stream = new FileInputStream(file);
             readWavFile(stream);
             stream.close();
-            return new Wav(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
+            return new WAV(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
         } catch (IOException e) {
             System.out.println("Error decoding WAV file.");
             e.printStackTrace();
         }
-        return new Wav(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
+        return new WAV(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
     }
 
     public void readWavFile(FileInputStream stream) throws IOException {

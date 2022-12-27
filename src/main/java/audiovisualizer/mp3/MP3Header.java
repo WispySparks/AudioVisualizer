@@ -9,6 +9,7 @@ public record MP3Header(
     double samplingFrequency,
     boolean padded,
     Mode mode,
+    int modeExtensionNumber,
     boolean intensityStereo,
     boolean msStereo,
     JointStereoBands bands,

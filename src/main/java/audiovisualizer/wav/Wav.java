@@ -1,6 +1,6 @@
 package audiovisualizer.wav;
 
-public record Wav(
+public record WAV(
 
     short audioFormat,
     short numChannels,
