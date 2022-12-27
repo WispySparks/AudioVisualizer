@@ -5,6 +5,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import audiovisualizer.mp3.MP3Header.Emphasis;
 import audiovisualizer.mp3.MP3Header.JointStereoBands;
@@ -15,10 +17,11 @@ import audiovisualizer.util.Triple;
 
 public class MP3Decoder { 
 
+    List<MP3Frame> frames = new ArrayList<>();
     MP3Header currentHeader;
     short crc;
 
-    public void decode(File file) {
+    public MP3 decode(File file) {
         try {
             FileInputStream stream = new FileInputStream(file);
             if (checkForMetadata(stream)) {
@@ -26,9 +29,24 @@ public class MP3Decoder {
             }
             readFrame(stream);
             stream.close();
+            return new MP3(frames);
         } catch (IOException e) {
             System.out.println("MP3 decoding error with file " + file.getAbsolutePath()); 
             e.printStackTrace();
+        }
+        return new MP3(frames);
+    }
+    @SuppressWarnings("unused")
+    private void readFrame(FileInputStream stream) throws IOException {
+        currentHeader = readFrameHeader(stream);
+        if (currentHeader.errorProtection()) {
+            crc = readCRC(stream);
+        }
+        int frameLength = getFrameLength(stream);
+        switch(currentHeader.layer()) {
+            case LAYER1 -> readAudioDataLayer1(stream);
+            case LAYER2 -> readAudioDataLayer2(stream);
+            case LAYER3 -> readAudioDataLayer3(stream);
         }
     }
 
@@ -72,21 +90,6 @@ public class MP3Decoder {
         int metadataSize = ByteBuffer.wrap(b).getInt(); // Get size of ID3 tag
         if (footer) metadataSize += 10;
         stream.skip(metadataSize);
-    }
-
-    @SuppressWarnings("unused")
-    private void readFrame(FileInputStream stream) throws IOException {
-        currentHeader = readFrameHeader(stream);
-        if (currentHeader.errorProtection()) {
-            crc = readCRC(stream);
-        }
-        int frameLength = getFrameLength(stream);
-        System.out.println(currentHeader.layer());
-        switch(currentHeader.layer()) {
-            case LAYER1 -> readAudioDataLayer1(stream);
-            case LAYER2 -> readAudioDataLayer2(stream);
-            case LAYER3 -> readAudioDataLayer3(stream);
-        }
     }
 
     /**

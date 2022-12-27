@@ -12,27 +12,43 @@ import javax.sound.sampled.SourceDataLine;
 
 public class AudioPlayer {
 
-    // Currently Blocking
+    /**
+     * Plays PCM audio in a new thread.
+     * @param PCM data
+     * @param sampleRate number of samples per second
+     * @param bitsPerSample bits for each value of a sample
+     * @param numChannels number of channels pcm data is broken up into. 1 = mono, ect.
+     * @param loopAmount number of times you want audio to play
+     */
     public void playPCMData(byte[] PCM, int sampleRate, int bitsPerSample, int numChannels, int loopAmount) {
         try {
             if (loopAmount < 1) loopAmount = 1;
+            final int num = loopAmount;
             AudioFormat audioFormat = new AudioFormat(sampleRate, bitsPerSample, numChannels, true, false);
             SourceDataLine line = AudioSystem.getSourceDataLine(null);
-
             line.open(audioFormat);
-            line.start();
-            for (int i = 0; i < loopAmount; i++) {
-                line.write(PCM, 0, PCM.length);
-            }            
-
-            line.drain();
-            line.stop();
-            line.close();
+            Thread t = new Thread(() -> {
+                line.start();
+                for (int i = 0; i < num; i++) {
+                    line.write(PCM, 0, PCM.length);
+                }            
+                line.drain();
+                line.stop();
+                line.close();
+            });
+            t.start();
         } catch (LineUnavailableException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Parses raw PCM data into samples based on the number of channels and bits per sample specified. Supports 8, 16, 32 and 64 bits per sample.
+     * @param PCM data
+     * @param bitsPerSample bits for each value of a sample
+     * @param numChannels number of channels pcm data is broken up into. 1 = mono, ect.
+     * @return A list of channels that in turn are list's of the samples
+     */
     public List<List<Long>> parsePCMData(byte[] PCM, int bitsPerSample, int numChannels) {
         int bytesPerSample = bitsPerSample / 8;
         int samples = PCM.length / numChannels / bytesPerSample;
@@ -49,7 +65,7 @@ public class AudioPlayer {
                     case 2 -> buffer.getShort();
                     case 4 -> buffer.getInt();
                     case 8 -> buffer.getLong();
-                    default -> throw new IllegalArgumentException("Unsupported audio format (bitsPerSample) of " + bitsPerSample);
+                    default -> throw new IllegalArgumentException("Unsupported audio format has " + bytesPerSample + " bytes per sample. Only support 1, 2, 4 and 8.");
                 };
                 channels.get(j).add(sample);
                 pos += bytesPerSample;
