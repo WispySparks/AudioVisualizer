@@ -17,29 +17,28 @@ public record MP3Header(
     Emphasis emphasis
     
 ) {
-    enum MPEGVersion {
+    public enum MPEGVersion {
         MPEG_1,
         MPEG_2,
         MPEG_2_5,
     }
 
-    enum Layer {
+    public enum Layer {
         LAYER1,
         LAYER2,
         LAYER3,
     }
 
-    enum Mode {
+    public enum Mode {
         STEREO,
         JOINT_STEREO,
         DUAL_CHANNEL,
         SINGLE_CHANNEL
     }
 
-    enum Emphasis {
+    public enum Emphasis {
         NONE,
         MICROSECONDS_50_15,
-        RESERVED,
         CCITT_J_17
     }
 }
