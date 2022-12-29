@@ -1,7 +1,5 @@
 package audiovisualizer.util;
 
-import java.nio.BufferUnderflowException;
-
 public class BitBuffer {
     
     private String buffer = "";
@@ -16,7 +14,7 @@ public class BitBuffer {
     }
 
     public int readNBits(int len) {
-        if (len > buffer.length()) throw new BufferUnderflowException();
+        if (len > buffer.length()) throw new IllegalArgumentException("BufferUnderflowException: Requested " + len + " bits is out of bounds for buffer length: " + buffer.length());
         if (len < 0) throw new IllegalArgumentException("len < 0");
         String bits = buffer.substring(0, len);
         buffer = buffer.substring(len);

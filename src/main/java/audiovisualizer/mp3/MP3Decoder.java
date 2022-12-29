@@ -27,7 +27,9 @@ public class MP3Decoder {
             if (checkForMetadata(stream)) {
                 readMetadata(stream);
             }
-            readFrame(stream);
+            while (containsSyncWord(stream)) {
+                readFrame(stream);
+            }
             stream.close();
             return new MP3(frames);
         } catch (IOException e) {
@@ -52,63 +54,23 @@ public class MP3Decoder {
     }
 
     /**
-     * Checks for ID3v2 metadata. <p>
-     * {@link} https://id3.org/id3v2.4.0-structure
-     */
-    private boolean checkForMetadata(FileInputStream stream) throws IOException {
-        String id3 = "ID3";
-        byte[] bytes = stream.readNBytes(3);
-        for (int i = 0; i < bytes.length; i++) {
-            if (bytes[i] != id3.charAt(i)) {
-                stream.skip(-3);
-                return false;
-            }
-        }
-        return true;
-    }
-    /**
-     * Reads ID3v2 metadata. Subclasses can override this method to read and return metadata. <p>
-     * {@link} https://id3.org/id3v2.4.0-structure
-     */
-    private void readMetadata(FileInputStream stream) throws IOException {
-        stream.skip(2); // Skip ID3 version bytes
-        boolean footer = false;
-        int flags = stream.read(); // Get ID3 flags
-        if ((flags & 0b0001000) != 0) footer = true; // If the footer flag is set then it's not zero and there is a footer
-        byte[] b = stream.readNBytes(4);
-        int[] bytes = new int[b.length];
-        for (int i = 0; i < b.length; i++) {
-            bytes[i] = b[i];
-        }
-        for (int i = 0; i < bytes.length-1; i++) { // Synchsafe integer bullshit
-            int lastBit = bytes[i] & 1;
-            bytes[i] = bytes[i] >> 1;
-            bytes[i+1] = bytes[i+1] | (lastBit << 7);
-        }
-        for (int i = 0; i < b.length; i++) {
-            b[i] = (byte) bytes[i];
-        }
-        int metadataSize = ByteBuffer.wrap(b).getInt(); // Get size of ID3 tag
-        if (footer) metadataSize += 10;
-        stream.skip(metadataSize);
-    }
-
-    /**
-     * Looks for a sync word and errors if it can't find one.
+     * Looks for a sync word until it hits EOF. 
+     * If it does find a syncword then it goes back 1 byte so that it can be used in the header.
      * @param stream
      * @return the second byte used for the syncword since it contains header information
      * @throws IOException
      */
-    private int findSyncWord(FileInputStream stream) throws IOException {
+    private boolean containsSyncWord(FileInputStream stream) throws IOException {
         while (true) {
             int syncword1 = stream.read();
             int syncword2 = stream.read();
-            if (syncword1 == -1) throw new StreamCorruptedException("No Syncword Found.");
-            if (syncword1 != 0xFF || (syncword2 >> 4) != 0xF) {
-                stream.skip(-1);
+            if (syncword1 == -1) return false;
+            // Confirm that the sync word is 11 '1' bits and that the version and or layer is not reserved.
+            stream.skip(-1);
+            if (syncword1 != 0xFF || (syncword2 >> 5) != 7 || (syncword2 & 0b00011000 >> 3) == 1 || (syncword2 & 0b00000110 >> 1) == 0) {
                 continue;
             }
-            return syncword2;
+            return true;
         }        
     }
 
@@ -123,18 +85,16 @@ public class MP3Decoder {
      * @throws IOException if any corruptions or invalid values are found when trying to parse the header
      */
     private MP3Header readFrameHeader(FileInputStream stream) throws IOException {
-        int headerInfo = findSyncWord(stream); // Frame Sync
-        int versionNumber = headerInfo & 0b00001000 >> 3; // MPEG Audio version
+        int headerInfo = stream.read();
+        int versionNumber = headerInfo & 0b00011000 >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version 
             case 0 -> MPEGVersion.MPEG_2_5;
-            case 1 -> MPEGVersion.MPEG_1; // Reserved
             case 2 -> MPEGVersion.MPEG_2;
             case 3 -> MPEGVersion.MPEG_1;
             default -> throw new StreamCorruptedException("MP3 Header Invalid Version " + versionNumber);
         };
         int layerNumber = headerInfo & 0b00000110 >> 1; // MPEG Layer
         Layer layer = switch(layerNumber) { // MPEG Layer
-            case 0 -> Layer.LAYER1; // Reserved
             case 1 -> Layer.LAYER3;
             case 2 -> Layer.LAYER2;
             case 3 -> Layer.LAYER1;
@@ -204,7 +164,7 @@ public class MP3Decoder {
                     case 12 -> 384;
                     case 13 -> 416;
                     case 14 -> 448;
-                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index);
+                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index + " for mpeg layer " + layer + " of mpeg version " + version);
                 };
                 case LAYER2: yield switch(index) {
                     case 0 -> 0;
@@ -222,7 +182,7 @@ public class MP3Decoder {
                     case 12 -> 256;
                     case 13 -> 320;
                     case 14 -> 384;
-                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index);
+                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index + " for mpeg layer " + layer + " of mpeg version " + version);
                 };
                 case LAYER3: yield switch(index) {
                     case 0 -> 0;
@@ -240,7 +200,7 @@ public class MP3Decoder {
                     case 12 -> 224;
                     case 13 -> 256;
                     case 14 -> 320;
-                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index);
+                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index + " for mpeg layer " + layer + " of mpeg version " + version);
                 };
             };
             case MPEG_2:
@@ -261,7 +221,7 @@ public class MP3Decoder {
                     case 12 -> 192;
                     case 13 -> 224;
                     case 14 -> 256;
-                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index);
+                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index + " for mpeg layer " + layer + " of mpeg version " + version);
                 };
                 case LAYER2:
                 case LAYER3: yield switch(index) {
@@ -280,7 +240,7 @@ public class MP3Decoder {
                     case 12 -> 128;
                     case 13 -> 144;
                     case 14 -> 160;
-                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index);
+                    default -> throw new StreamCorruptedException("MP3 Header Invalid Bitrate Index " + index + " for mpeg layer " + layer + " of mpeg version " + version);
                 };
             };
         };
@@ -300,22 +260,19 @@ public class MP3Decoder {
                 case 0 -> 44.1;
                 case 1 -> 48;
                 case 2 -> 32;
-                case 3 -> 0;
-                default -> throw new StreamCorruptedException("MP3 Header Invalid Frequency Index " + index);
+                default -> throw new StreamCorruptedException("MP3 Header Invalid Frequency Index " + index + " for mpeg version " + version);
             };
             case MPEG_2: yield switch(index) {
                 case 0 -> 22.05;
                 case 1 -> 24;
                 case 2 -> 16;
-                case 3 -> 0;
-                default -> throw new StreamCorruptedException("MP3 Header Invalid Frequency Index " + index);
+                default -> throw new StreamCorruptedException("MP3 Header Invalid Frequency Index " + index + " for mpeg version " + version);
             };
             case MPEG_2_5: yield switch(index) {
                 case 0 -> 11.025;
                 case 1 -> 12;
                 case 2 -> 8;
-                case 3 -> 0;
-                default -> throw new StreamCorruptedException("MP3 Header Invalid Frequency Index " + index);
+                default -> throw new StreamCorruptedException("MP3 Header Invalid Frequency Index " + index + " for mpeg version " + version);
             };
         };
     }
@@ -389,7 +346,7 @@ public class MP3Decoder {
      * @throws IOException
      */
     private void readAudioDataLayer1(FileInputStream stream, int length) throws IOException {
-        BitBuffer buffer = new BitBuffer(stream.readNBytes(length), false);
+        BitBuffer buffer = new BitBuffer(stream.readNBytes(length*4+6), false);
         int maxChannels = currentHeader.mode() == Mode.SINGLE_CHANNEL ? 1 : 2;
         int[][] bitAllocation = new int[maxChannels][32]; // Channel, Sub-band
         int[][] scaleFactor = new int[maxChannels][32]; // Channel, Sub-band
@@ -435,6 +392,49 @@ public class MP3Decoder {
 
     private void readAudioDataLayer3(FileInputStream stream) throws IOException {
         
+    }
+
+    /**
+     * Checks for ID3v2 metadata. <p>
+     * {@link} https://id3.org/id3v2.4.0-structure
+     */
+    private boolean checkForMetadata(FileInputStream stream) throws IOException {
+        String id3 = "ID3";
+        byte[] bytes = stream.readNBytes(3);
+        for (int i = 0; i < bytes.length; i++) {
+            if (bytes[i] != id3.charAt(i)) {
+                stream.skip(-3);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Reads ID3v2 metadata. Subclasses can override this method to read and return metadata. <p>
+     * {@link} https://id3.org/id3v2.4.0-structure
+     */
+    private void readMetadata(FileInputStream stream) throws IOException {
+        stream.skip(2); // Skip ID3 version bytes
+        boolean footer = false;
+        int flags = stream.read(); // Get ID3 flags
+        if ((flags & 0b0001000) != 0) footer = true; // If the footer flag is set then it's not zero and there is a footer
+        byte[] b = stream.readNBytes(4);
+        int[] bytes = new int[b.length];
+        for (int i = 0; i < b.length; i++) {
+            bytes[i] = b[i];
+        }
+        for (int i = 0; i < bytes.length-1; i++) { // Synchsafe integer bullshit
+            int lastBit = bytes[i] & 1;
+            bytes[i] = bytes[i] >> 1;
+            bytes[i+1] = bytes[i+1] | (lastBit << 7);
+        }
+        for (int i = 0; i < b.length; i++) {
+            b[i] = (byte) bytes[i];
+        }
+        int metadataSize = ByteBuffer.wrap(b).getInt(); // Get size of ID3 tag
+        if (footer) metadataSize += 10;
+        stream.skip(metadataSize);
     }
     
 }
