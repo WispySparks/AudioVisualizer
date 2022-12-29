@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import audiovisualizer.mp3.MP3Decoder;
+import audiovisualizer.wav.WavDecoder;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 
@@ -16,7 +17,7 @@ public class Main {
 
     public static void main(String[] args) {
         MP3Decoder decoder = new MP3Decoder();
-        // WavDecoder wavDecoder = new WavDecoder();
+        WavDecoder wavDecoder = new WavDecoder();
         // WAV wav = wavDecoder.decode(new File("C:\\Users\\wispy\\Music\\Music\\chromemusicsong.wav"));
         // AudioPlayer player = new AudioPlayer();
         // player.playPCMData(wav.data(), wav.sampleRate(), wav.bitsPerSample(), wav.numChannels(), 1);
@@ -25,6 +26,7 @@ public class Main {
         // MPEG Version 1 Audio Layer 3
         File mp3 = new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3");
         List<File> files = new ArrayList<>();
+        // files.add(new File("C:\\Users\\wispy\\Downloads\\isocompliancetesting\\layer1\\fl1.mpg"));
         files.add(new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3"));
         // files.add(new File("C:\\Users\\wispy\\Music\\Music\\RegularShowCredits.mp3"));
         // files.add(new File("C:\\Users\\wispy\\Music\\Music\\World 8 Bowser Theme.mp3"));

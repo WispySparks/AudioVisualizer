@@ -12,7 +12,6 @@ public record MP3Header(
     int modeExtensionNumber,
     boolean intensityStereo,
     boolean msStereo,
-    JointStereoBands bands,
     boolean copyrighted,
     boolean original,
     Emphasis emphasis
@@ -35,13 +34,6 @@ public record MP3Header(
         JOINT_STEREO,
         DUAL_CHANNEL,
         SINGLE_CHANNEL
-    }
-
-    enum JointStereoBands {
-        BAND_4_31,
-        BAND_8_31,
-        BAND_12_31,
-        BAND_16_31
     }
 
     enum Emphasis {

@@ -6,15 +6,14 @@ import java.io.IOException;
 import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import audiovisualizer.mp3.MP3Header.Emphasis;
-import audiovisualizer.mp3.MP3Header.JointStereoBands;
 import audiovisualizer.mp3.MP3Header.Layer;
 import audiovisualizer.mp3.MP3Header.MPEGVersion;
 import audiovisualizer.mp3.MP3Header.Mode;
-import audiovisualizer.util.Triple;
+import audiovisualizer.util.BitBuffer;
+import javafx.util.Pair;
 
 public class MP3Decoder { 
 
@@ -38,15 +37,15 @@ public class MP3Decoder {
         return new MP3(frames);
     }
 
-    @SuppressWarnings("unused")
     private void readFrame(FileInputStream stream) throws IOException {
         currentHeader = readFrameHeader(stream);
         if (currentHeader.errorProtection()) {
             crc = readCRC(stream);
         }
         int frameLength = getFrameLength(stream);
+        System.out.println(currentHeader);
         switch(currentHeader.layer()) {
-            case LAYER1 -> readAudioDataLayer1(stream);
+            case LAYER1 -> readAudioDataLayer1(stream, frameLength);
             case LAYER2 -> readAudioDataLayer2(stream);
             case LAYER3 -> readAudioDataLayer3(stream);
         }
@@ -95,6 +94,25 @@ public class MP3Decoder {
     }
 
     /**
+     * Looks for a sync word and errors if it can't find one.
+     * @param stream
+     * @return the second byte used for the syncword since it contains header information
+     * @throws IOException
+     */
+    private int findSyncWord(FileInputStream stream) throws IOException {
+        while (true) {
+            int syncword1 = stream.read();
+            int syncword2 = stream.read();
+            if (syncword1 == -1) throw new StreamCorruptedException("No Syncword Found.");
+            if (syncword1 != 0xFF || (syncword2 >> 4) != 0xF) {
+                stream.skip(-1);
+                continue;
+            }
+            return syncword2;
+        }        
+    }
+
+    /**
      * Reads an MP3 Frame header which is 4 bytes long and returns an MP3Header record by parsing the data from the 32 bits that contain the following: 
      * MPEG Version, MPEG Layer, Error Protection (boolean), Bitrate in kbps, Sampling Frequency in kHz, Frame Padded (boolean),
      * Channel Mode, Mode Extension Bands for Layers 1 & 2 or type of joint stereo for Layer 3 - when Channel Mode is JOINT_STEREO,
@@ -105,10 +123,7 @@ public class MP3Decoder {
      * @throws IOException if any corruptions or invalid values are found when trying to parse the header
      */
     private MP3Header readFrameHeader(FileInputStream stream) throws IOException {
-        int syncword = stream.read(); // Frame sync
-        int headerInfo = stream.read();
-        int syncword2 = headerInfo >> 4; // Frame sync
-        if (syncword != 0xFF || syncword2 != 0xF ) throw new StreamCorruptedException("MP3 Header Invalid Syncword " + syncword + " " + syncword2); // Make sure sync word is FFF
+        int headerInfo = findSyncWord(stream); // Frame Sync
         int versionNumber = headerInfo & 0b00001000 >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version 
             case 0 -> MPEGVersion.MPEG_2_5;
@@ -142,12 +157,10 @@ public class MP3Decoder {
         int modeExtensionNumber = headerInfo3 & 0b00110000 >> 4; // Mode extension (Only if Joint stereo)
         boolean intensityStereo = false;
         boolean msStereo = false;
-        JointStereoBands bands = JointStereoBands.BAND_4_31;
         if (mode == Mode.JOINT_STEREO) { // Mode extension (Only if Joint stereo)
-            Triple<Boolean, Boolean, JointStereoBands> modeExtension = configureModeExtension(layer, modeExtensionNumber);
-            intensityStereo = modeExtension.getFirst();
-            msStereo = modeExtension.getSecond();
-            bands = modeExtension.getThird();
+            Pair<Boolean, Boolean> modeExtension = configureModeExtension(layer, modeExtensionNumber);
+            intensityStereo = modeExtension.getKey();
+            msStereo = modeExtension.getValue();
         }
         boolean copyrighted = (headerInfo3 & 0b00001000 >> 3) == 1;
         boolean original = (headerInfo3 & 0b00000100 >> 2) == 1; // Original or Copy
@@ -160,7 +173,7 @@ public class MP3Decoder {
             default -> throw new StreamCorruptedException("MP3 Header Invalid Emphasis " + emphasisNumber);
         };
         MP3Header header = new MP3Header(version, layer, errorProtection, bitrate, frequency, 
-        padded, mode, modeExtensionNumber, intensityStereo, msStereo, bands, copyrighted, original, emphasis);
+        padded, mode, modeExtensionNumber, intensityStereo, msStereo, copyrighted, original, emphasis);
         return header;
     }
 
@@ -308,27 +321,19 @@ public class MP3Decoder {
     }
 
     /**
-     * Used when the channel mode is JOINT_STEREO to find out what the bands to use for Layer 1 & 2 or what combination of 
+     * Used when the channel mode is JOINT_STEREO to find out what combination of 
      * intensity/ms stereo to use for Layer 3.
      * @param layer MPEG Layer
      * @param index 2 bit index from MP3 Header
-     * @return A datatype that holds the whether or not to use intensity stereo, ms stereo and the bands to use for Layer 1 or 2
+     * @return A datatype that holds the whether or not to use intensity stereo, ms stereo
      * @throws StreamCorruptedException
      */
-    private Triple<Boolean, Boolean, JointStereoBands> configureModeExtension(Layer layer, int index) throws StreamCorruptedException {
+    private Pair<Boolean, Boolean> configureModeExtension(Layer layer, int index) throws StreamCorruptedException {
         boolean intensityStereo = false;
         boolean msStereo = false;
-        JointStereoBands bands = JointStereoBands.BAND_4_31;
         if (layer == Layer.LAYER1 || layer == Layer.LAYER2) {
             intensityStereo = true;
             msStereo = false;
-            bands = switch(index) {
-                case 0 -> JointStereoBands.BAND_4_31;
-                case 1 -> JointStereoBands.BAND_8_31;
-                case 2 -> JointStereoBands.BAND_12_31;
-                case 3 -> JointStereoBands.BAND_16_31;
-                default -> throw new StreamCorruptedException("MP3 Header Invalid Mode Extension " + index);
-            };
         } 
         else {
             switch(index) {
@@ -350,7 +355,7 @@ public class MP3Decoder {
                 }
             }
         }
-        return new Triple<Boolean,Boolean, JointStereoBands>(intensityStereo, msStereo, bands);
+        return new Pair<Boolean,Boolean>(intensityStereo, msStereo);
     }    
 
     /**
@@ -367,15 +372,15 @@ public class MP3Decoder {
      * {@link} http://www.diva-portal.org/smash/get/diva2:830195/FULLTEXT01.pdf 
      */
     private int getFrameLength(FileInputStream stream) throws IOException {
-        int frameLengthBytes = 0;
+        double frameLengthBytes = 0;
         if (currentHeader.layer() == Layer.LAYER1) {
-            frameLengthBytes = (int) (12 * currentHeader.bitrate()/currentHeader.samplingFrequency());
+            frameLengthBytes = (12 * currentHeader.bitrate()/currentHeader.samplingFrequency());
         } else {
             // FLB = 144 * (Bitrate/Samplerate) + Padding where FLB is the frame length in bytes
-            frameLengthBytes = (int) (144 * currentHeader.bitrate()/currentHeader.samplingFrequency());
+            frameLengthBytes = (144 * currentHeader.bitrate()/currentHeader.samplingFrequency());
         }
         if (currentHeader.padded()) frameLengthBytes++;
-        return frameLengthBytes;
+        return (int) frameLengthBytes;
     }
 
     /**
@@ -383,44 +388,45 @@ public class MP3Decoder {
      * @param stream
      * @throws IOException
      */
-    private void readAudioDataLayer1(FileInputStream stream) throws IOException { 
-        // Unsigned integer, most significant bit first. = uimsbf
-        int[][] bitAllocation = new int[2][32]; // Channel, Sub-band
-        int[][] scaleFactor = new int[2][32]; // Channel, Sub-band
-        int[][][] sample = new int[2][32][12]; // Channel, Sub-band, uh idk 
+    private void readAudioDataLayer1(FileInputStream stream, int length) throws IOException {
+        BitBuffer buffer = new BitBuffer(stream.readNBytes(length), false);
+        int maxChannels = currentHeader.mode() == Mode.SINGLE_CHANNEL ? 1 : 2;
+        int[][] bitAllocation = new int[maxChannels][32]; // Channel, Sub-band
+        int[][] scaleFactor = new int[maxChannels][32]; // Channel, Sub-band
+        int[][][] sample = new int[maxChannels][32][12]; // Channel, Sub-band, uh idk 
         int bound = currentHeader.mode() == Mode.JOINT_STEREO ? (currentHeader.modeExtensionNumber()+1)*4 : 32;
-        int numberOfChannels = currentHeader.mode() == Mode.SINGLE_CHANNEL ? 1 : 2;
         for (int subBand = 0; subBand < bound; subBand++) {
-            for (int channel = 0; channel < numberOfChannels; channel++) {
-                bitAllocation[channel][subBand] = stream.read() >>> 4; // fix this , 4 bits, uimsbf
+            for (int channel = 0; channel < maxChannels; channel++) {
+                bitAllocation[channel][subBand] = buffer.readNBits(4);
             }
         }
         for (int subBand = bound; subBand < 32; subBand++) {
-            bitAllocation[0][subBand] = stream.read() >>> 4; // fix this , 4 bits, uimsbf
-            bitAllocation[1][subBand] = bitAllocation[0][subBand];
+            bitAllocation[0][subBand] = buffer.readNBits(4);
+            if (maxChannels > 1) {
+                bitAllocation[1][subBand] = bitAllocation[0][subBand];
+            }
         }
         for (int subBand = 0; subBand < 32; subBand++) {
-            for (int channel = 0; channel < numberOfChannels; channel++) {
+            for (int channel = 0; channel < maxChannels; channel++) {
                 if (bitAllocation[channel][subBand] != 0) {
-                    scaleFactor[channel][subBand] = stream.read() >>> 2; // fix this , 6 bits, uimsbf
+                    scaleFactor[channel][subBand] = buffer.readNBits(6);
                 }
             }
         }
         for (int s = 0; s < 12; s++) {
             for (int subBand = 0; subBand < bound; subBand++) {
-                for (int channel = 0; channel < numberOfChannels; channel++) {
+                for (int channel = 0; channel < maxChannels; channel++) {
                     if (bitAllocation[channel][subBand] != 0) {
-                        sample[channel][subBand][s] = 0; // stream.readNBits(bitAllocation[channel][subBand]+1); uimsbf
+                        sample[channel][subBand][s] = buffer.readNBits(bitAllocation[channel][subBand]+1);
                     }
                 }
             }
             for (int subBand = bound; subBand < 32; subBand++) {
                 if (bitAllocation[0][subBand] != 0) {
-                    sample[0][subBand][s] = 0; // stream.readNBits(bitAllocation[0][subBand]+1); uimsbf
+                    sample[0][subBand][s] =  buffer.readNBits(bitAllocation[0][subBand]+1);
                 }
             }
         }
-        System.out.println(Arrays.deepToString(sample));        
     }
 
     private void readAudioDataLayer2(FileInputStream stream) throws IOException {

@@ -83,9 +83,11 @@ public class WavDecoder {
         while (true) { // apparently there can be other chunks but we dont care so just look for the data chunk
             byte[] idToCheck = stream.readNBytes(4);
             if (idToCheck[0] == -1) throw new StreamCorruptedException("No Data Chunk Found.");
-            stream.skip(-4);
             for (int i = 0; i < idToCheck.length; i++) {
-                if (idToCheck[i] != id.charAt(i)) continue;
+                if (idToCheck[i] != id.charAt(i)) {
+                    stream.skip(-3);
+                    continue;
+                }
             }
             break;
         }        
