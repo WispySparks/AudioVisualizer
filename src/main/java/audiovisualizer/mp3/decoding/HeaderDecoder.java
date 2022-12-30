@@ -1,7 +1,6 @@
 package audiovisualizer.mp3.decoding;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.StreamCorruptedException;
 
 import audiovisualizer.mp3.MP3Header;
@@ -40,19 +39,20 @@ public class HeaderDecoder {
      * Copyrighted (boolean), Original or Copy (boolean), and the type of de-emphasis to use. <p>
      * {@link} https://en.wikipedia.org/wiki/MP3#/media/File:Mp3filestructure.svg
      * {@link} http://mpgedit.org/mpgedit/mpeg_format/mpeghdr.htm
+     * {@link} http://www.mp3-tech.org/programmer/frame_header.html
      * @param stream MP3 file stream to read header from
      * @throws IOException if any corruptions or invalid values are found when trying to parse the header
      */
-    public MP3Header readFrameHeader(InputStream stream) throws IOException {
+    public MP3Header readFrameHeader(BitInputStream stream) throws IOException {
         int headerInfo = stream.read();
-        int versionNumber = headerInfo & 0b00011000 >> 3; // MPEG Audio version
+        int versionNumber = (headerInfo & 0b00011000) >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version, 1 is reserved.
             case 0 -> MPEGVersion.MPEG_2_5;
             case 2 -> MPEGVersion.MPEG_2;
             case 3 -> MPEGVersion.MPEG_1;
             default -> throw new StreamCorruptedException("MP3 Header Invalid Version Index " + versionNumber);
         };
-        int layerNumber = headerInfo & 0b00000110 >> 1; // MPEG Layer
+        int layerNumber = (headerInfo & 0b00000110) >> 1; // MPEG Layer
         Layer layer = switch(layerNumber) { // MPEG Layer, 0 is reserved.
             case 1 -> Layer.LAYER3;
             case 2 -> Layer.LAYER2;
@@ -62,10 +62,10 @@ public class HeaderDecoder {
         boolean errorProtection = (headerInfo & 1) == 0; // Protection bit
         int headerInfo2 = stream.read();
         double bitrate = bitrateTable[versionToIndex(version, true)][layerToIndex(layer)][headerInfo2 >> 4]; // Bitrate from index
-        double frequency = frequencyTable[versionToIndex(version, false)][headerInfo2 & 0b00001100 >> 2]; // Sampling rate frequency from index
-        boolean padded = (headerInfo2 & 0b00000010 >> 1) == 1; // Padding bit
+        double frequency = frequencyTable[versionToIndex(version, false)][(headerInfo2 & 0b00001100) >> 2]; // Sampling rate frequency from index
+        boolean padded = (headerInfo2 & 0b00000010) >> 1 == 1; // Padding bit
         int headerInfo3 = stream.read();
-        int modeNumber = headerInfo3 >> 6; // Channel Mode
+        int modeNumber = (headerInfo3 >> 6); // Channel Mode
         Mode mode = switch(modeNumber) { // Channel Mode
             case 0 -> Mode.STEREO;
             case 1 -> Mode.JOINT_STEREO;
@@ -73,7 +73,7 @@ public class HeaderDecoder {
             case 3 -> Mode.SINGLE_CHANNEL;
             default -> throw new StreamCorruptedException("MP3 Header Invalid Channel Mode Index " + modeNumber); // Shouldn't happen
         };
-        int modeExtensionNumber = headerInfo3 & 0b00110000 >> 4; // Mode extension (Only if Joint stereo)
+        int modeExtensionNumber = (headerInfo3 & 0b00110000) >> 4; // Mode extension (Only if Joint stereo)
         boolean intensityStereo = false;
         boolean msStereo = false;
         if (mode == Mode.JOINT_STEREO) { // Mode Extension if Joint Stereo
@@ -83,9 +83,9 @@ public class HeaderDecoder {
                 msStereo = modeExtensionNumber >> 1 == 1;
             }
         }
-        boolean copyrighted = (headerInfo3 & 0b00001000 >> 3) == 1;
-        boolean original = (headerInfo3 & 0b00000100 >> 2) == 1; // Original or Copy
-        int emphasisNumber = headerInfo3 & 0b00000011;
+        boolean copyrighted = (headerInfo3 & 0b00001000) >> 3 == 1;
+        boolean original = (headerInfo3 & 0b00000100) >> 2 == 1; // Original or Copy
+        int emphasisNumber = (headerInfo3 & 0b00000011);
         Emphasis emphasis = switch(emphasisNumber) { // Type of de-emphasis that shall be used, index 2 is reserved.
             case 0 -> Emphasis.NONE;
             case 1 -> Emphasis.MICROSECONDS_50_15; 

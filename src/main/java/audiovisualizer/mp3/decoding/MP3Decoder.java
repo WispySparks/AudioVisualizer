@@ -3,11 +3,9 @@ package audiovisualizer.mp3.decoding;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import audiovisualizer.mp3.MP3;
 import audiovisualizer.mp3.MP3Frame;
@@ -30,7 +28,6 @@ public class MP3Decoder {
             while (containsSyncWord(stream)) {
                 readFrame(stream);
             }
-            System.out.println("Finished!");
             stream.close();
             return new MP3(frames);
         } catch (IOException e) {
@@ -43,9 +40,9 @@ public class MP3Decoder {
     private void readFrame(BitInputStream stream) throws IOException {
         try {
             currentHeader = headerDecoder.readFrameHeader(stream);
-        } catch (StreamCorruptedException e) {
+        } catch (StringIndexOutOfBoundsException e) {
             if (e.getMessage() != null && e.getMessage().startsWith("MP3 Header Invalid")) {
-                // return; // If this frame has a messed up header ideally we should skip it.
+                return; // If this frame has a messed up header ideally we should skip it.
             }
         }
         if (currentHeader.errorProtection()) {
@@ -68,17 +65,16 @@ public class MP3Decoder {
      * @throws IOException
      */
     private boolean containsSyncWord(BitInputStream stream) throws IOException {
-        stream.assertByteBoundary();
+        stream.assertByteBoundary(); // All sync words should be on byte boundaries...
         while (true) {
             int syncword1 = stream.read();
             int syncword2 = stream.read();
-            if (syncword1 == -1 && syncword2 == -1) return false;
+            if (syncword1 == -1 || syncword2 == -1) return false;
             // Confirm that the sync word is 11 '1' bits and that the version and or layer is not reserved.
             stream.skip(-1);
-            if (syncword1 != 0xFF || (syncword2 >> 5) != 7 || (syncword2 & 0b00011000 >> 3) == 1 || (syncword2 & 0b00000110 >> 1) == 0) {
+            if (syncword1 != 0xFF || (syncword2 >> 5) != 7 || ((syncword2 & 0b00011000) >> 3 == 1) || ((syncword2 & 0b00000110) >> 1 == 0)) {
                 continue;
             }
-            System.out.println("Good syncword " + new Random().nextInt(100));
             return true;
         }        
     }
@@ -92,22 +88,6 @@ public class MP3Decoder {
     private short readCRC(BitInputStream stream) throws IOException {
         return ByteBuffer.wrap(stream.readNBytes(2)).getShort();
     }
-
-    /**
-     * {@link} http://www.diva-portal.org/smash/get/diva2:830195/FULLTEXT01.pdf 
-     * @return Frame Length in Bytes.
-     */
-    // private int getFrameLength() {
-    //     double frameLengthBytes = 0;
-    //     if (currentHeader.layer() == Layer.LAYER1) {
-    //         frameLengthBytes = (12 * currentHeader.bitrate()/currentHeader.samplingFrequency());
-    //         if (currentHeader.padded()) frameLengthBytes += 4; // Add an extra slot cause padded bit is set in header.
-    //     } else {
-    //         frameLengthBytes = (144 * currentHeader.bitrate()/currentHeader.samplingFrequency());
-    //         if (currentHeader.padded()) frameLengthBytes++; // Add an extra slot cause padded bit is set in header.
-    //     }
-    //     return (int) frameLengthBytes;
-    // }
 
     /**
      * {@link} https://www.iso.org/standard/22412.html Section 2.4.1.5

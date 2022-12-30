@@ -10,12 +10,24 @@ public class BitInputStream extends FilterInputStream {
     /**Bit Buffer Length in Bits*/
     private int bufferLength = 0;
 
+    private int pos = 0;
+
     public BitInputStream(InputStream in) {
         super(in);
     }
 
-    public void assertByteBoundary() throws IOException {
+    /**
+     * Brings you to a byte boundary.
+     * @return whether or not you were already on a byte boundary.
+     * @throws IOException
+     */
+    public boolean assertByteBoundary() throws IOException {
         readNBits(bufferLength%8);
+        return bufferLength % 8 == 0;
+    }
+
+    public int getStreamPosition() {
+        return pos;
     }
 
     private void clearBuffer() {
@@ -32,6 +44,7 @@ public class BitInputStream extends FilterInputStream {
             for (int i = 0; i < readAmount; i++) {
                 int num = in.read();
                 if (num == -1) return -1;
+                pos++;
                 bitBuffer = bitBuffer << 8; // make space for new byte
                 bitBuffer = bitBuffer | num; // set new byte
             }
@@ -56,6 +69,7 @@ public class BitInputStream extends FilterInputStream {
     public long skip(long n) throws IOException {
         long l = super.skip(n);
         clearBuffer();
+        pos += n;
         return l;
     }
 
