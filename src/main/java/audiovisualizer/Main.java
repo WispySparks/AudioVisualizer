@@ -1,7 +1,8 @@
 package audiovisualizer;
 
 import java.io.File;
-import java.io.InputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,11 +16,19 @@ public class Main {
 
     private static Media media;
     private static MediaPlayer player;
-
     public static void main(String[] args) {
         MP3Decoder decoder = new MP3Decoder();
-        BitInputStream dummy = new BitInputStream(InputStream.nullInputStream());
-        dummy.readNBits(17);
+        BitInputStream dummy;
+        try {
+            dummy = new BitInputStream(new FileInputStream("C:\\Users\\wispy\\Downloads\\test.txt"));
+            System.out.println(dummy.readNBits(8));
+            System.out.println(dummy.readNBits(4));
+            System.out.println(dummy.readNBits(2));
+            // System.out.println(dummy.readNBits(2));
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
+        
         // WavDecoder wavDecoder = new WavDecoder();
         // WAV wav = wavDecoder.decode(new File("C:\\Users\\wispy\\Music\\Music\\chromemusicsong.wav"));
         // AudioPlayer player = new AudioPlayer();
