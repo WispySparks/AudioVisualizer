@@ -1,7 +1,7 @@
 package audiovisualizer.mp3.decoding;
 
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StreamCorruptedException;
 
 import audiovisualizer.mp3.MP3Header;
@@ -9,7 +9,6 @@ import audiovisualizer.mp3.MP3Header.Emphasis;
 import audiovisualizer.mp3.MP3Header.Layer;
 import audiovisualizer.mp3.MP3Header.MPEGVersion;
 import audiovisualizer.mp3.MP3Header.Mode;
-import javafx.util.Pair;
 
 public class HeaderDecoder {
 
@@ -44,7 +43,7 @@ public class HeaderDecoder {
      * @param stream MP3 file stream to read header from
      * @throws IOException if any corruptions or invalid values are found when trying to parse the header
      */
-    public MP3Header readFrameHeader(FileInputStream stream) throws IOException {
+    public MP3Header readFrameHeader(InputStream stream) throws IOException {
         int headerInfo = stream.read();
         int versionNumber = headerInfo & 0b00011000 >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version, 1 is reserved.
@@ -77,10 +76,12 @@ public class HeaderDecoder {
         int modeExtensionNumber = headerInfo3 & 0b00110000 >> 4; // Mode extension (Only if Joint stereo)
         boolean intensityStereo = false;
         boolean msStereo = false;
-        if (mode == Mode.JOINT_STEREO) { // Mode extension (Only if Joint stereo)
-            Pair<Boolean, Boolean> modeExtension = configureModeExtension(layer, modeExtensionNumber);
-            intensityStereo = modeExtension.getKey();
-            msStereo = modeExtension.getValue();
+        if (mode == Mode.JOINT_STEREO) { // Mode Extension if Joint Stereo
+            intensityStereo = true;
+            if (layer == Layer.LAYER3) {
+                intensityStereo = (modeExtensionNumber & 1) == 1;
+                msStereo = modeExtensionNumber >> 1 == 1;
+            }
         }
         boolean copyrighted = (headerInfo3 & 0b00001000 >> 3) == 1;
         boolean original = (headerInfo3 & 0b00000100 >> 2) == 1; // Original or Copy
@@ -96,23 +97,6 @@ public class HeaderDecoder {
         return new MP3Header(version, layer, errorProtection, bitrate, frequency, 
         padded, mode, modeExtensionNumber, intensityStereo, msStereo, copyrighted, original, emphasis);
     }
-
-    /**
-     * Used when the channel mode is JOINT_STEREO to find out what combination of 
-     * intensity/ms stereo to use for Layer 3.
-     * @param layer MPEG Layer
-     * @param index 2 bit modeExtensionNumber from MP3 Header
-     * @return A datatype that holds the whether or not to use intensity stereo, ms stereo
-     */
-    private Pair<Boolean, Boolean> configureModeExtension(Layer layer, int modeExtensionNumber) {
-        boolean intensityStereo = true;
-        boolean msStereo = false;
-        if (layer == Layer.LAYER3) {
-            intensityStereo = (modeExtensionNumber & 1) == 1;
-            msStereo = modeExtensionNumber >> 1 == 1;
-        }
-        return new Pair<Boolean,Boolean>(intensityStereo, msStereo);
-    }    
 
     private int versionToIndex(MPEGVersion version, boolean twoSame) {
         if (!twoSame) {
