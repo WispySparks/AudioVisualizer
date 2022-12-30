@@ -3,6 +3,7 @@ package audiovisualizer.mp3.decoding;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.StreamCorruptedException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,9 +16,9 @@ import audiovisualizer.mp3.MP3Header.Mode;
 public class MP3Decoder { 
 
     private HeaderDecoder headerDecoder = new HeaderDecoder();
-    List<MP3Frame> frames = new ArrayList<>();
-    MP3Header currentHeader;
-    short crc = -1;
+    private List<MP3Frame> frames = new ArrayList<>();
+    private MP3Header currentHeader;
+    private short crc = -1;
 
     public MP3 decode(File file) {
         try {
@@ -29,6 +30,8 @@ public class MP3Decoder {
                 readFrame(stream);
             }
             stream.close();
+            // System.out.println(count + " frames were read");
+            // System.out.println(frames.size() + " frames were stored");
             return new MP3(frames);
         } catch (IOException e) {
             System.out.println("MP3 decoding error with file " + file.getAbsolutePath()); 
@@ -36,29 +39,28 @@ public class MP3Decoder {
         }
         return new MP3(frames);
     }
-
+    public static int count = 0;
     private void readFrame(BitInputStream stream) throws IOException {
         try {
             currentHeader = headerDecoder.readFrameHeader(stream);
-        } catch (StringIndexOutOfBoundsException e) {
+        } catch (StreamCorruptedException e) {
             if (e.getMessage() != null && e.getMessage().startsWith("MP3 Header Invalid")) {
+                // count++;
                 return; // If this frame has a messed up header ideally we should skip it.
             }
         }
-        if (currentHeader.errorProtection()) {
-            crc = readCRC(stream);
-        }
+        if (currentHeader.errorProtection()) crc = readCRC(stream);
         // System.out.println(currentHeader);
-        switch(currentHeader.layer()) {
+        int[][][] pcm = switch(currentHeader.layer()) {
             case LAYER1 -> readAudioDataLayer1(stream);
             case LAYER2 -> readAudioDataLayer2(stream);
             case LAYER3 -> readAudioDataLayer3(stream);
-        }
-        frames.add(new MP3Frame(currentHeader, crc, true, null, null));
+        };
+        frames.add(new MP3Frame(currentHeader, crc, true, pcm, null));
     }
 
     /**
-     * Looks for a sync word until it hits EOF. 
+     * Looks for a sync word until it hits EOF at which point it returns false. 
      * If it does find a syncword then it goes back 1 byte so that it can be used in the header.
      * @param stream
      * @return the second byte used for the syncword since it contains header information
@@ -90,15 +92,17 @@ public class MP3Decoder {
     }
 
     /**
-     * {@link} https://www.iso.org/standard/22412.html Section 2.4.1.5
+     * {@link} https://www.iso.org/standard/22412.html Section 2.4.1.5 and Section 2.4.3.2
      * @param stream
      * @throws IOException
      */
-    private void readAudioDataLayer1(BitInputStream stream) throws IOException {
+    private int[][][] readAudioDataLayer1(BitInputStream stream) throws IOException {
         int maxChannels = currentHeader.mode() == Mode.SINGLE_CHANNEL ? 1 : 2;
         int[][] bitAllocation = new int[maxChannels][32]; // Channel, Sub-band
         int[][] scaleFactor = new int[maxChannels][32]; // Channel, Sub-band
-        int[][][] sample = new int[maxChannels][32][12]; // Channel, Sub-band, uh idk 
+        int[][][] sample = new int[maxChannels][32][12]; // Channel, Sub-band, Sample
+        int[][][] fractionalNumbers = new int[maxChannels][32][12]; // Channel, Sub-band, Sample 
+        int[][][]  requantizedSamples = new int[maxChannels][32][12]; // Channel, Sub-band, Sample 
         int bound = currentHeader.mode() == Mode.JOINT_STEREO ? (currentHeader.modeExtensionNumber()+1)*4 : 32;
         for (int subBand = 0; subBand < bound; subBand++) {
             for (int channel = 0; channel < maxChannels; channel++) {
@@ -131,13 +135,41 @@ public class MP3Decoder {
                     sample[0][subBand][s] = stream.readNBits(bitAllocation[0][subBand]+1);
                 }
             }
+            // Requantization of subband samples 
+            for (int subBand = 0; subBand < bound; subBand++) {
+                for (int channel = 0; channel < maxChannels; channel++) {
+                    if (bitAllocation[channel][subBand] != 0) {
+                        int shiftAmount = (numBits(sample[channel][subBand][s])-1);
+                        // Invert first bit
+                        fractionalNumbers[channel][subBand][s] = sample[channel][subBand][s] ^ (1 << shiftAmount); 
+                        // Apply formula
+                        requantizedSamples[channel][subBand][s] = 
+                        requantizationFormula(fractionalNumbers[channel][subBand][s], bitAllocation[channel][subBand]+1);
+                        // Apply scale factor
+                        requantizedSamples[channel][subBand][s] = requantizedSamples[channel][subBand][s] * scaleFactor[channel][subBand];
+                    }
+                }
+            }
         }
+        return requantizedSamples;
     }
 
-    private void readAudioDataLayer2(BitInputStream stream) throws IOException {
+    private int requantizationFormula(int fractionalNumber, int bitsAllocated) {
+        double requantizedValue = 
+        (Math.pow(2, bitsAllocated) / (Math.pow(2, bitsAllocated)-1)) * (fractionalNumber + Math.pow(2, (-1*bitsAllocated+1)));
+        return (int) Math.round(requantizedValue);
+    } 
+
+    private int[][][] readAudioDataLayer2(BitInputStream stream) throws IOException {
+        return null;
     }
 
-    private void readAudioDataLayer3(BitInputStream stream) throws IOException {
+    private int[][][] readAudioDataLayer3(BitInputStream stream) throws IOException {
+        return null;
+    }
+
+    private int numBits(int i) {
+        return Integer.toBinaryString(i).length();
     }
 
     /**

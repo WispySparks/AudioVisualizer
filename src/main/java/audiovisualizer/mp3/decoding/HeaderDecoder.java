@@ -44,20 +44,22 @@ public class HeaderDecoder {
      * @throws IOException if any corruptions or invalid values are found when trying to parse the header
      */
     public MP3Header readFrameHeader(BitInputStream stream) throws IOException {
+        MP3Decoder.count++;
+        String headerPosition = Integer.toHexString(stream.getStreamPosition());
         int headerInfo = stream.read();
         int versionNumber = (headerInfo & 0b00011000) >> 3; // MPEG Audio version
         MPEGVersion version = switch(versionNumber) { // MPEG Audio version, 1 is reserved.
             case 0 -> MPEGVersion.MPEG_2_5;
             case 2 -> MPEGVersion.MPEG_2;
             case 3 -> MPEGVersion.MPEG_1;
-            default -> throw new StreamCorruptedException("MP3 Header Invalid Version Index " + versionNumber);
+            default -> throw new StreamCorruptedException("MP3 Header Invalid Version Index " + versionNumber + ". At Hex " + headerPosition);
         };
         int layerNumber = (headerInfo & 0b00000110) >> 1; // MPEG Layer
         Layer layer = switch(layerNumber) { // MPEG Layer, 0 is reserved.
             case 1 -> Layer.LAYER3;
             case 2 -> Layer.LAYER2;
             case 3 -> Layer.LAYER1;
-            default -> throw new StreamCorruptedException("MP3 Header Invalid Layer Index " + layerNumber);
+            default -> throw new StreamCorruptedException("MP3 Header Invalid Layer Index " + layerNumber + ". At Hex " + headerPosition);
         };
         boolean errorProtection = (headerInfo & 1) == 0; // Protection bit
         int headerInfo2 = stream.read();
@@ -71,17 +73,16 @@ public class HeaderDecoder {
             case 1 -> Mode.JOINT_STEREO;
             case 2 -> Mode.DUAL_CHANNEL;
             case 3 -> Mode.SINGLE_CHANNEL;
-            default -> throw new StreamCorruptedException("MP3 Header Invalid Channel Mode Index " + modeNumber); // Shouldn't happen
+            default -> throw new StreamCorruptedException("MP3 Header Invalid Channel Mode Index " + modeNumber + ". At Hex " + headerPosition); // Shouldn't happen
         };
+        // System.out.println(Integer.toBinaryString(headerInfo3));
+        // System.out.println(mode + " " + modeNumber);
         int modeExtensionNumber = (headerInfo3 & 0b00110000) >> 4; // Mode extension (Only if Joint stereo)
-        boolean intensityStereo = false;
+        boolean intensityStereo = (mode == Mode.JOINT_STEREO);
         boolean msStereo = false;
-        if (mode == Mode.JOINT_STEREO) { // Mode Extension if Joint Stereo
-            intensityStereo = true;
-            if (layer == Layer.LAYER3) {
-                intensityStereo = (modeExtensionNumber & 1) == 1;
-                msStereo = modeExtensionNumber >> 1 == 1;
-            }
+        if (mode == Mode.JOINT_STEREO && layer == Layer.LAYER3) { // Mode Extension if Joint Stereo
+            intensityStereo = (modeExtensionNumber & 1) == 1;
+            msStereo = modeExtensionNumber >> 1 == 1;
         }
         boolean copyrighted = (headerInfo3 & 0b00001000) >> 3 == 1;
         boolean original = (headerInfo3 & 0b00000100) >> 2 == 1; // Original or Copy
@@ -90,10 +91,10 @@ public class HeaderDecoder {
             case 0 -> Emphasis.NONE;
             case 1 -> Emphasis.MICROSECONDS_50_15; 
             case 3 -> Emphasis.CCITT_J_17;
-            default -> throw new StreamCorruptedException("MP3 Header Invalid Emphasis Index " + emphasisNumber);
+            default -> throw new StreamCorruptedException("MP3 Header Invalid Emphasis Index " + emphasisNumber + ". At Hex " + headerPosition);
         };
-        if (bitrate == -1) throw new StreamCorruptedException("MP3 Header Invalid Bitrate, had an index of 15.");
-        if (frequency == -1) throw new StreamCorruptedException("MP3 Header Invalid Sampling Frequency, had an index of 15.");
+        if (bitrate == -1) throw new StreamCorruptedException("MP3 Header Invalid Bitrate, had an index of 15. At Hex " + headerPosition);
+        if (frequency == -1) throw new StreamCorruptedException("MP3 Header Invalid Sampling Frequency, had an index of 15. At Hex " + headerPosition);
         return new MP3Header(version, layer, errorProtection, bitrate, frequency, 
         padded, mode, modeExtensionNumber, intensityStereo, msStereo, copyrighted, original, emphasis);
     }
