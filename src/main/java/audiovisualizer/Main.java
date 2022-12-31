@@ -4,25 +4,22 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import audiovisualizer.gui.MainChart;
 import audiovisualizer.mp3.decoding.MP3Decoder;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.paint.Color;
+import javafx.stage.Stage;
 
-@SuppressWarnings("unused")
-public class Main {
+public class Main extends Application {
 
-    private static Media media;
-    private static MediaPlayer player;
     public static void main(String[] args) {
         MP3Decoder decoder = new MP3Decoder();
-        // WavDecoder wavDecoder = new WavDecoder();
-        // WAV wav = wavDecoder.decode(new File("C:\\Users\\wispy\\Music\\Music\\chromemusicsong.wav"));
-        // AudioPlayer player = new AudioPlayer();
-        // player.playPCMData(wav.data(), wav.sampleRate(), wav.bitsPerSample(), wav.numChannels(), 1);
-        // List<List<Long>> samples = player.parsePCMData(wav.data(), wav.bitsPerSample(), wav.numChannels());
         // System.out.println(samples.get(0).size()/wav.sampleRate()); // returns 18 - audio file is 18 seconds, LETS GOO!!
         // MPEG Version 1 Audio Layer 3
-        File mp3 = new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3");
+        // File mp3 = new File("C:\\Users\\wispy\\Music\\Music\\SMW Star Road Rip.mp3");
         List<File> files = new ArrayList<>();
         files.add(new File("C:\\Users\\wispy\\ProgrammingProjects\\CPP\\out.bin"));
         /*
@@ -45,6 +42,37 @@ public class Main {
         //     player = new MediaPlayer(media);
         //     player.play();
         // });
+        launch(args);
+    }
+
+    MainChart chart;
+
+    @Override
+    public void start(Stage primaryStage) throws Exception {
+        NumberAxis xAxis = new NumberAxis(); 
+        NumberAxis yAxis = new NumberAxis();
+        xAxis.setLabel("Time/s");
+        xAxis.setAnimated(false); 
+        yAxis.setLabel("Value");
+        yAxis.setAnimated(false); 
+        chart = new MainChart(xAxis, yAxis);
+        XYChart.Series<Number, Number> series = new XYChart.Series<>();
+        series.setName("Data Series");
+        chart.getData().add(series);
+        Scene scene = new Scene(chart); 
+        scene.setFill(Color.grayRgb(40));
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Audio Visualizer");
+        primaryStage.setMaximized(true);
+        primaryStage.show();
+        
+        
+    }
+
+    @Override
+    public void stop() throws Exception {
+        super.stop();
+        chart.scheduledExecutorService.shutdownNow();
     }
     
 }

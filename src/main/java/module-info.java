@@ -3,4 +3,5 @@ module audiovisualizer {
     requires javafx.base;
     requires javafx.controls;
     requires javafx.media;
+    exports audiovisualizer;
 }

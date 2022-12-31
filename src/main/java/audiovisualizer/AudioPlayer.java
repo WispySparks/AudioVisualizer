@@ -30,7 +30,9 @@ public class AudioPlayer {
             Thread t = new Thread(() -> {
                 line.start();
                 for (int i = 0; i < num; i++) {
-                    line.write(PCM, 0, PCM.length);
+                    for (int j = 0; j < PCM.length; j+= 500) {
+                        line.write(PCM, j, 500);
+                    }
                 }            
                 line.drain();
                 line.stop();
