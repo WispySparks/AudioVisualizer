@@ -8,6 +8,10 @@ repositories {
     mavenCentral()
 }
 
+dependencies {
+    // implementation 'de.gsi.chart:chartfx-chart:11.1.5'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -17,9 +21,6 @@ java {
 javafx {
     version = '19'
     modules = [ 'javafx.controls', 'javafx.media' ]
-}
-
-dependencies {
 }
 
 application {

@@ -20,20 +20,19 @@ public class AudioPlayer {
      * @param numChannels number of channels pcm data is broken up into. 1 = mono, ect.
      * @param loopAmount number of times you want audio to play
      */
-    public void playPCMData(byte[] PCM, int sampleRate, int bitsPerSample, int numChannels, int loopAmount) {
+    public void playPCMData(byte[] PCM, int sampleRate, int bitsPerSample, int numChannels, Runnable callback) {
         try {
-            if (loopAmount < 1) loopAmount = 1;
-            final int num = loopAmount;
             AudioFormat audioFormat = new AudioFormat(sampleRate, bitsPerSample, numChannels, true, false);
             SourceDataLine line = AudioSystem.getSourceDataLine(null);
             line.open(audioFormat);
             Thread t = new Thread(() -> {
+                int writeAmount = 500;
                 line.start();
-                for (int i = 0; i < num; i++) {
-                    for (int j = 0; j < PCM.length; j+= 500) {
-                        line.write(PCM, j, 500);
-                    }
-                }            
+                for (int j = 0; j < PCM.length; j+= writeAmount) {
+                    line.write(PCM, j, writeAmount);
+                    callback.run();
+                }
+                // line.write(PCM, 0, PCM.length);
                 line.drain();
                 line.stop();
                 line.close();
@@ -45,16 +44,16 @@ public class AudioPlayer {
     }
 
     /**
-     * Parses raw PCM data into samples based on the number of channels and bits per sample specified. Supports 8, 16, 32 and 64 bits per sample.
+     * Parses raw PCM data into samples based on the number of channels and bits per sample specified. Supports 8, 16, and 32 bits per sample.
      * @param PCM data
      * @param bitsPerSample bits for each value of a sample
      * @param numChannels number of channels pcm data is broken up into. 1 = mono, ect.
      * @return A list of channels that in turn are list's of the samples
      */
-    public List<List<Long>> parsePCMData(byte[] PCM, int bitsPerSample, int numChannels) {
+    public List<List<Integer>> parsePCMData(byte[] PCM, int bitsPerSample, int numChannels) {
         int bytesPerSample = bitsPerSample / 8;
         int samples = PCM.length / numChannels / bytesPerSample;
-        List<List<Long>> channels = new ArrayList<>();
+        List<List<Integer>> channels = new ArrayList<>();
         int pos = 0;
         for (int i = 0; i < numChannels; i++) {
             channels.add(new ArrayList<>());
@@ -62,12 +61,11 @@ public class AudioPlayer {
         for (int i = 0; i < samples; i++) {
             for (int j = 0; j < numChannels; j++) {
                 ByteBuffer buffer = ByteBuffer.wrap(getNBytes(PCM, pos, bytesPerSample)).order(ByteOrder.LITTLE_ENDIAN);
-                long sample = switch(bytesPerSample) {
+                int sample = switch(bytesPerSample) {
                     case 1 -> buffer.get();
                     case 2 -> buffer.getShort();
                     case 4 -> buffer.getInt();
-                    case 8 -> buffer.getLong();
-                    default -> throw new IllegalArgumentException("Unsupported audio format has " + bytesPerSample + " bytes per sample. Only support 1, 2, 4 and 8.");
+                    default -> throw new IllegalArgumentException("Unsupported audio format has " + bytesPerSample + " bytes per sample. Only support 1, 2, and 4.");
                 };
                 channels.get(j).add(sample);
                 pos += bytesPerSample;
