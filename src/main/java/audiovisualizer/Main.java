@@ -9,8 +9,7 @@ import javafx.stage.Stage;
 
 public class Main extends Application {
 
-    private MainChart chart;
-    private AudioPlayer audioPlayer = new AudioPlayer();
+    private MainChart chart = new MainChart();
     
     public static void main(String[] args) {
         launch(args);
@@ -20,9 +19,8 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) throws Exception {
         BorderPane pane = new BorderPane();
-        chart = new MainChart(audioPlayer);
         pane.setCenter(chart.getChart());
-        pane.setTop(new TopPane(chart));
+        pane.setTop(new TopPane(stage, chart));
         Scene scene = new Scene(pane); 
         stage.setScene(scene);
         stage.setTitle("Audio Visualizer");

@@ -1,6 +1,7 @@
 package audiovisualizer.wav;
 
 import java.io.File;
+import java.util.function.Supplier;
 
 public record WAV(
 
@@ -13,6 +14,8 @@ public record WAV(
     int bitsPerSample,
     byte[] data
 
-) {
-    
+) implements Supplier<File> {
+    public File get() {
+        return file;
+    }
 }

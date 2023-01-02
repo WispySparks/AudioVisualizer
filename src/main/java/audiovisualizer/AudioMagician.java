@@ -5,26 +5,35 @@ import java.nio.ByteOrder;
 
 public class AudioMagician {
 
+    public static final double windowSeconds = 0.4;
+
     /**
      * 
      * @param pcm data
      * @param samplingFrequency in Hz
-     * @return audio volume in dB, each value represents 400 ms of audio.
+     * @param bitsPerSample number of bits that makes up a sample
+     * @param numChannels number of channels in pcm
+     * @return Audio volume in relative to each other, each value represents 400 ms of audio. 
+     * The last value might represent less than 400 ms if the pcm doesn't divide evenly into the pcm length.
      */
     public double[] getAudioVolume(byte[] pcm, double samplingFrequency, int bitsPerSample, int numChannels) {
-        final double windowSeconds = 0.4;
-        int[][] parsedPCM = parsePCMData(pcm, bitsPerSample, numChannels, ByteOrder.LITTLE_ENDIAN);
         // 400 ms window
-        int windowSize = (int) (samplingFrequency * windowSeconds); // window length in samples
+        final int windowSize = (int) (samplingFrequency * windowSeconds); // window length in samples
+        int[][] parsedPCM = parsePCMData(pcm, bitsPerSample, numChannels, ByteOrder.LITTLE_ENDIAN);
         int numWindows = parsedPCM[0].length / windowSize; // number of 400 ms windows = number of samples in a channel / window size
-        double[][] rmsNums = new double[numWindows][windowSize];
-        double[] decibels = new double[numWindows];
-        for (int currentWindow = 0; currentWindow < numWindows; currentWindow++) {
+        int remainder = parsedPCM[0].length % windowSize;
+        if (remainder != 0) numWindows++; // add another window if it doesn't divide perfectly
+        double[][] rmsNums = new double[numWindows][windowSize]; // root mean square numbers
+        double[] decibels = new double[numWindows]; // volume numbers
+        // go through every window of time and grab the number of samples in that window and then take the rms of those samples
+        for (int currentWindow = 0; currentWindow < numWindows; currentWindow++) { 
             for (int currentSample = 0; currentSample < windowSize; currentSample++) {
-                int offset = currentWindow * windowSize;
+                int offset = currentWindow * windowSize; // this is how many windows we've already gone by in terms of samples
                 double val = 0;
+                // also average out the current sample across all channels
                 for (int channel = 0; channel < numChannels; channel++) {
-                    val += parsedPCM[0][currentSample + offset];
+                    if (currentSample + offset >= parsedPCM[channel].length) continue; // This is for when we're on remainder window
+                    val += parsedPCM[channel][currentSample + offset];
                 }
                 val /= numChannels;
                 rmsNums[currentWindow][currentSample] = val;
@@ -34,12 +43,11 @@ public class AudioMagician {
             decibels[i] = rootMeanSquare(rmsNums[i]);
         }
         for (int i = 0; i < decibels.length; i++) {
-            decibels[i] = 20*Math.log10(decibels[i]);
+            if (decibels[i] == 0) continue;
+            decibels[i] = Math.log10(decibels[i]);
         }
         return decibels;
     }
-
-    
 
     /**
      * Parses raw PCM data into samples based on the number of channels and bits per sample specified. Supports 8, 16, and 32 bits per sample.
@@ -62,8 +70,13 @@ public class AudioMagician {
                 int currentSample = switch(bytesPerSample) {
                     case 1 -> buffer.get();
                     case 2 -> buffer.getShort();
+                    case 3 -> {
+                        short s = buffer.getShort();
+                        byte b = buffer.get();
+                        yield (b << 16) | s;
+                    }
                     case 4 -> buffer.getInt();
-                    default -> throw new IllegalArgumentException("Unsupported audio format has " + bytesPerSample + " bytes per sample. Only support 1, 2, and 4.");
+                    default -> throw new IllegalArgumentException("Unsupported audio format has " + bytesPerSample + " bytes per sample. Only support 1, 2, 3, and 4.");
                 };
                 parsedPCM[channel][sample] = currentSample;
                 pos += bytesPerSample;

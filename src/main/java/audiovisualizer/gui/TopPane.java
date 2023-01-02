@@ -1,24 +1,41 @@
 package audiovisualizer.gui;
 
+import java.io.File;
+
 import javafx.scene.control.Button;
 import javafx.scene.layout.GridPane;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Stage;
 
 public class TopPane extends GridPane {
 
-    private final MainChart chart;
+    private final Stage stage;
+    private final MainChart chart;  
+    private final FileChooser chooser = new FileChooser();
     
-    public TopPane(MainChart chart) {
+    public TopPane(Stage stage, MainChart chart) {
         super();
+        this.stage = stage;
         this.chart = chart;
+        chooser.getExtensionFilters().add(new ExtensionFilter("Audio Files", "*.MP3", "*.WAV"));
         setup();
     }
 
     private void setup() {
-        Button button = new Button("Start");
-        button.setOnAction((event) -> {
+        Button selectFile = new Button("Select Audio File");
+        Button startButton = new Button("Start");
+        startButton.setOnAction((e) -> {
             chart.start();
         });
-        add(button, 0, 0);
+        selectFile.setOnAction((e) -> {
+            File file;
+            if ((file = chooser.showOpenDialog(stage)) != null ) {
+                chart.setFile(file);
+            }
+        });
+        add(startButton, 0, 0);
+        add(selectFile, 1, 0);
     }
 
 }
