@@ -32,12 +32,12 @@ public class MP3Decoder {
             stream.close();
             // System.out.println(count + " frames were read");
             // System.out.println(frames.size() + " frames were stored");
-            return new MP3(frames);
+            return new MP3(file, frames);
         } catch (IOException e) {
             System.out.println("MP3 decoding error with file " + file.getAbsolutePath()); 
             e.printStackTrace();
         }
-        return new MP3(frames);
+        return new MP3(file, frames);
     }
     public static int count = 0;
     private void readFrame(BitInputStream stream) throws IOException {

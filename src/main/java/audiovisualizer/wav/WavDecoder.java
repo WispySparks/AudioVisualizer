@@ -28,12 +28,12 @@ public class WavDecoder {
             FileInputStream stream = new FileInputStream(file);
             readWavFile(stream);
             stream.close();
-            return new WAV(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
+            return new WAV(file, audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
         } catch (IOException e) {
             System.out.println("Error decoding WAV file.");
             e.printStackTrace();
         }
-        return new WAV(audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
+        return new WAV(file, audioFormat, numChannels, sampleRate, byteRate, blockAlign, bitsPerSample, data);
     }
 
     public void readWavFile(FileInputStream stream) throws IOException {
@@ -82,12 +82,16 @@ public class WavDecoder {
         final String id = "data";
         while (true) { // apparently there can be other chunks but we dont care so just look for the data chunk
             byte[] idToCheck = stream.readNBytes(4);
-            if (idToCheck[0] == -1) throw new StreamCorruptedException("No Data Chunk Found.");
+            boolean goAgain = false;
             for (int i = 0; i < idToCheck.length; i++) {
+                if (idToCheck[i] == -1) throw new StreamCorruptedException("No Data Chunk Found.");
                 if (idToCheck[i] != id.charAt(i)) {
-                    stream.skip(-3);
-                    continue;
+                    goAgain = true;
                 }
+            }
+            if (goAgain) {
+                stream.skip(-3);
+                continue;
             }
             break;
         }        

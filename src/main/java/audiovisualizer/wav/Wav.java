@@ -1,7 +1,10 @@
 package audiovisualizer.wav;
 
+import java.io.File;
+
 public record WAV(
 
+    File file,
     short audioFormat,
     short numChannels,
     int sampleRate,
