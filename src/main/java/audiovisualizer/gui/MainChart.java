@@ -6,8 +6,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import audiovisualizer.AudioMagician;
-import audiovisualizer.AudioPlayer;
+import audiovisualizer.audio.AudioMagician;
+import audiovisualizer.audio.AudioPlayer;
 import audiovisualizer.wav.WAV;
 import audiovisualizer.wav.WavDecoder;
 import javafx.application.Platform;

@@ -1,4 +1,4 @@
-package audiovisualizer;
+package audiovisualizer.audio;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -13,15 +13,16 @@ public class AudioMagician {
      * @param samplingFrequency in Hz
      * @param bitsPerSample number of bits that makes up a sample
      * @param numChannels number of channels in pcm
-     * @return Audio volume in relative to each other, each value represents 400 ms of audio. 
+     * @return Audio volume of windows of time relative to each other (sort of decibels), each value represents 400 ms of audio. 
      * The last value might represent less than 400 ms if the pcm doesn't divide evenly into the pcm length.
      */
     public double[] getAudioVolume(byte[] pcm, double samplingFrequency, int bitsPerSample, int numChannels) {
         // 400 ms window
         final int windowSize = (int) (samplingFrequency * windowSeconds); // window length in samples
         int[][] parsedPCM = parsePCMData(pcm, bitsPerSample, numChannels, ByteOrder.LITTLE_ENDIAN);
-        int numWindows = parsedPCM[0].length / windowSize; // number of 400 ms windows = number of samples in a channel / window size
-        int remainder = parsedPCM[0].length % windowSize;
+        double[][] weightedPCM = applyAWeighting(parsedPCM);
+        int numWindows = weightedPCM[0].length / windowSize; // number of 400 ms windows = number of samples in a channel / window size
+        int remainder = weightedPCM[0].length % windowSize;
         if (remainder != 0) numWindows++; // add another window if it doesn't divide perfectly
         double[][] rmsNums = new double[numWindows][windowSize]; // root mean square numbers
         double[] decibels = new double[numWindows]; // volume numbers
@@ -32,8 +33,8 @@ public class AudioMagician {
                 double val = 0;
                 // also average out the current sample across all channels
                 for (int channel = 0; channel < numChannels; channel++) {
-                    if (currentSample + offset >= parsedPCM[channel].length) continue; // This is for when we're on remainder window
-                    val += parsedPCM[channel][currentSample + offset];
+                    if (currentSample + offset >= weightedPCM[channel].length) continue; // This is for when we're on remainder window
+                    val += weightedPCM[channel][currentSample + offset];
                 }
                 val /= numChannels;
                 rmsNums[currentWindow][currentSample] = val;
@@ -44,7 +45,7 @@ public class AudioMagician {
         }
         for (int i = 0; i < decibels.length; i++) {
             if (decibels[i] == 0) continue;
-            decibels[i] = Math.log10(decibels[i]);
+            decibels[i] = 20 * Math.log10(decibels[i]) + 2;
         }
         return decibels;
     }
@@ -83,6 +84,27 @@ public class AudioMagician {
             }
         }
         return parsedPCM;
+    }
+
+    private double[][] applyAWeighting(int[][] pcm) {
+        double[][] aWeighted = new double[pcm.length][pcm[0].length];
+        for (int i = 0; i < pcm.length; i++) {
+            for (int j = 0; j < pcm[i].length; j++) {
+                aWeighted[i][j] = aWeight(pcm[i][j]);
+            }
+        } 
+        return aWeighted;
+    }
+
+    /**
+     * {@link} https://en.wikipedia.org/wiki/A-weighting#A
+     */
+    private double aWeight(double f) {
+        double y = (Math.pow(12194, 2) * Math.pow(f, 4)) /
+        ( ( Math.pow(f, 2) + Math.pow(20.6, 2) ) * 
+        Math.sqrt( (Math.pow(f, 2) + Math.pow(107.7, 2)) * (Math.pow(f, 2) + Math.pow(737.9, 2)) ) * 
+        ( Math.pow(f, 2) + Math.pow(12194, 2) ) );
+        return y;
     }
 
     private double rootMeanSquare(double[] numbers) {

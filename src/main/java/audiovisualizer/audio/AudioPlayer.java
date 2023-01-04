@@ -1,4 +1,4 @@
-package audiovisualizer;
+package audiovisualizer.audio;
 
 import java.io.File;
 import java.util.ArrayList;
