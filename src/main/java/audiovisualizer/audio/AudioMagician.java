@@ -44,7 +44,9 @@ public class AudioMagician {
             decibels[i] = rootMeanSquare(rmsNums[i]);
         }
         for (int i = 0; i < decibels.length; i++) {
-            if (decibels[i] == 0) continue;
+            if (decibels[i] == 0) {
+                decibels[i] += 0.000001;
+            }
             decibels[i] = 20 * Math.log10(decibels[i]) + 2;
         }
         return decibels;
