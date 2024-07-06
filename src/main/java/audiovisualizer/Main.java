@@ -10,6 +10,9 @@ import javafx.stage.Stage;
 public class Main extends Application {
 
     private MainChart chart = new MainChart();
+
+    // https://dsp.stackexchange.com/questions/46147/how-to-get-the-volume-level-from-pcm-audio-data
+    // https://github.com/csteinmetz1/pyloudnorm
     
     public static void main(String[] args) {
         launch(args);
